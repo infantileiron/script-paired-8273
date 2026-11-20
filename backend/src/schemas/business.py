@@ -10,6 +10,10 @@ class PairInput(BaseModel):
 class EvaluationInput(BaseModel):
  name:str=Field(min_length=2,max_length=100)
  team:Literal['全部','企业一组','企业二组']='全部'
+class ComparisonInput(BaseModel):
+ name:str=Field(min_length=2,max_length=120)
+ basis_a:int=Field(gt=0)
+ basis_b:int=Field(gt=0)
 class AdoptionInput(BaseModel):
  evaluation_id:int=Field(gt=0)
  decision:Literal['继续试点','分组采纳','暂缓采纳']

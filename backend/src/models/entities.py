@@ -9,6 +9,9 @@ class Pair(Base):
 class Evaluation(Base):
  __tablename__='evaluations'
  id=Column(Integer,primary_key=True);name=Column(String(100));team=Column(String(40));state=Column(String(20),default='queued');result=Column(JSON,nullable=True);error=Column(Text,default='')
+class Comparison(Base):
+ __tablename__='comparisons'
+ id=Column(Integer,primary_key=True);name=Column(String(120));state=Column(String(20),default='pending');basis=Column(JSON,nullable=True);result=Column(JSON,nullable=True);error=Column(Text,default='')
 class Adoption(Base):
  __tablename__='adoptions'
  id=Column(Integer,primary_key=True);evaluation_id=Column(Integer,ForeignKey('evaluations.id'));decision=Column(String(30));note=Column(Text);status=Column(String(20),default='draft')

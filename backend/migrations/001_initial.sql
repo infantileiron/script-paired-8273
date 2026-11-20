@@ -88,6 +88,40 @@ ALTER SEQUENCE public.audits_id_seq OWNED BY public.audits.id;
 
 
 --
+-- Name: comparisons; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.comparisons (
+    id integer NOT NULL,
+    name character varying(120),
+    state character varying(20),
+    basis json,
+    result json,
+    error text
+);
+
+
+--
+-- Name: comparisons_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.comparisons_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: comparisons_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.comparisons_id_seq OWNED BY public.comparisons.id;
+
+
+--
 -- Name: evaluations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -202,6 +236,13 @@ ALTER TABLE ONLY public.audits ALTER COLUMN id SET DEFAULT nextval('public.audit
 
 
 --
+-- Name: comparisons id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.comparisons ALTER COLUMN id SET DEFAULT nextval('public.comparisons_id_seq'::regclass);
+
+
+--
 -- Name: evaluations id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -236,6 +277,14 @@ ALTER TABLE ONLY public.adoptions
 
 ALTER TABLE ONLY public.audits
     ADD CONSTRAINT audits_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: comparisons comparisons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.comparisons
+    ADD CONSTRAINT comparisons_pkey PRIMARY KEY (id);
 
 
 --

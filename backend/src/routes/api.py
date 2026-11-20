@@ -3,12 +3,13 @@ import redis
 from fastapi import APIRouter,Depends,HTTPException,Response
 from sqlalchemy.exc import IntegrityError
 from src.config.database import db
-from src.models.entities import User,Pair,Evaluation,Adoption,Audit
-from src.schemas.business import Login,PairInput,EvaluationInput,AdoptionInput
+from src.models.entities import User,Pair,Evaluation,Comparison,Adoption,Audit
+from src.schemas.business import Login,PairInput,EvaluationInput,ComparisonInput,AdoptionInput
 from src.middlewares.auth import current,editor,admin
 from src.utils.security import verify,token
 from src.services.business import audit,dump
-from src.controllers.business import ensure_evaluation
+from src.services.comparison import freeze_basis,find_duplicates,duplicate_message,IncompleteBasis
+from src.controllers.business import ensure_evaluation,ensure_comparison
 router=APIRouter()
 @router.post('/auth/login')
 def login(data:Login,s=Depends(db)):
@@ -49,6 +50,38 @@ def export(i:int,u=Depends(current),s=Depends(db)):
  r=ensure_evaluation(s,i)
  if r.state!='done':raise HTTPException(409,'仅成功评估可导出')
  return Response(json.dumps(dump(r),ensure_ascii=False,indent=2),media_type='application/json',headers={'Content-Disposition':f'attachment; filename="script-paired-{i}.json"'})
+@router.get('/comparisons')
+def comparisons(u=Depends(current),s=Depends(db)):return [dump(r) for r in s.query(Comparison).order_by(Comparison.id.desc()).all()]
+@router.post('/comparisons')
+def create_comparison(data:ComparisonInput,u=Depends(editor),s=Depends(db)):
+ if data.basis_a==data.basis_b:raise HTTPException(422,'两版对比必须选择两份不同的评估')
+ try:
+  a=freeze_basis(ensure_evaluation(s,data.basis_a));b=freeze_basis(ensure_evaluation(s,data.basis_b))
+ except IncompleteBasis as e:raise HTTPException(422,str(e))
+ except HTTPException as e:
+  if e.status_code==404:raise HTTPException(422,'所选评估不存在，无法锁定依据')
+  raise
+ duplicates=find_duplicates(a,b)
+ if duplicates:raise HTTPException(422,duplicate_message(duplicates))
+ r=Comparison(name=data.name,state='pending',basis={'a':a,'b':b});s.add(r);s.commit()
+ try:redis.Redis.from_url(os.environ['REDIS_URL']).rpush('paired:comparisons',r.id)
+ except redis.RedisError:r.state='failed';r.error='队列暂不可用，请稍后重新提交';s.commit();raise HTTPException(503,r.error)
+ audit(s,u,'提交对比 '+str(r.id));return dump(r)
+@router.get('/comparisons/{i}')
+def comparison_detail(i:int,u=Depends(current),s=Depends(db)):return dump(ensure_comparison(s,i))
+@router.post('/comparisons/{i}/retry')
+def retry_comparison(i:int,u=Depends(editor),s=Depends(db)):
+ r=ensure_comparison(s,i)
+ if r.state!='failed':raise HTTPException(409,'仅中断或失败的对比可以恢复')
+ r.state='pending';r.error='';s.commit()
+ try:redis.Redis.from_url(os.environ['REDIS_URL']).rpush('paired:comparisons',r.id)
+ except redis.RedisError:r.state='failed';r.error='队列暂不可用，请稍后重新提交';s.commit();raise HTTPException(503,r.error)
+ audit(s,u,'重新提交对比 '+str(i));return dump(r)
+@router.get('/comparisons/{i}/export')
+def export_comparison(i:int,u=Depends(current),s=Depends(db)):
+ r=ensure_comparison(s,i)
+ if r.state!='done':raise HTTPException(409,'仅成功对比可导出')
+ return Response(json.dumps(dump(r),ensure_ascii=False,indent=2),media_type='application/json',headers={'Content-Disposition':f'attachment; filename="script-compare-{i}.json"'})
 @router.get('/adoptions')
 def adoptions(u=Depends(current),s=Depends(db)):return [dump(r) for r in s.query(Adoption).order_by(Adoption.id.desc()).all()]
 @router.post('/adoptions')
